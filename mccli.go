@@ -48,6 +48,7 @@ var (
 	errorColor   = color.New(color.FgRed)
 	successColor = color.New(color.FgGreen)
 	promptColor  = color.New(color.FgCyan, color.Bold)
+	commandColor = color.New(color.FgHiBlack) // 定义深灰色，用于命令提示符
 )
 
 // LogLevel 表示日志级别
@@ -96,7 +97,7 @@ var MinecraftFormatCode = map[rune]string{
 	'n': "\033[4m", // 下划线
 	'o': "\033[3m", // 斜体
 	'r': "\033[0m", // 重置
-	'x': "",        // 不支持的格式代码
+	'x': "",        // §x§<颜色混合代码>不做处理，没有ANSI对应
 }
 
 // parseMinecraftFormat 解析Minecraft格式控制符并转换为ANSI转义序列
@@ -694,8 +695,13 @@ func (s *ScreenManager) commandLoop(controller *mccontrol.MinecraftController) {
 
 // executeCommand 执行Minecraft命令
 func (s *ScreenManager) executeCommand(controller *mccontrol.MinecraftController, command string) {
-	// 在日志中显示命令
-	s.printInfo(fmt.Sprintf("执行命令: %s", command))
+	// 使用深灰色>>>显示命令
+	if s.enableColor {
+		commandColor.Print("\r>>> ")
+	} else {
+		fmt.Print("\r>>> ")
+	}
+	fmt.Printf("%s\n", command)
 
 	// 本地命令处理
 	if strings.HasPrefix(command, "/local ") {
@@ -717,7 +723,23 @@ func (s *ScreenManager) executeCommand(controller *mccontrol.MinecraftController
 	if err != nil {
 		s.printError(fmt.Sprintf("执行命令失败: %v", err))
 	} else {
-		s.printLog(fmt.Sprintf("服务器响应: %s", response))
+		// 响应可能包含多行，需要分行处理
+		responseLines := strings.Split(response, "\n")
+		fmt.Print("\r")
+		for _, line := range responseLines {
+			line = strings.TrimRight(line, "\r")
+			if line == "" {
+				continue
+			}
+
+			// 使用深灰色<<<显示响应
+			if s.enableColor {
+				commandColor.Print("<<< ")
+			} else {
+				fmt.Print("<<< ")
+			}
+			fmt.Println(parseMinecraftFormat(line, LogLevelInfo))
+		}
 	}
 }
 
@@ -838,6 +860,8 @@ func (s *ScreenManager) navigateHistory(direction int) {
 			// 向下已达到最后一条历史，退出历史浏览模式
 			s.commandBuffer = s.historyTempCommand
 			s.historyIndex = -1
+			s.cursorPos = len(s.commandBuffer) // 将光标设置到命令末尾
+			s.adjustScrollOffset()             // 调整滚动偏移量确保光标可见
 			return
 		}
 
@@ -847,6 +871,8 @@ func (s *ScreenManager) navigateHistory(direction int) {
 	// 更新命令缓冲区为历史记录中的命令
 	if s.historyIndex >= 0 && s.historyIndex < len(s.commandHistory) {
 		s.commandBuffer = s.commandHistory[s.historyIndex]
+		s.cursorPos = len(s.commandBuffer) // 将光标设置到命令末尾
+		s.adjustScrollOffset()             // 调整滚动偏移量确保光标可见
 	}
 }
 
