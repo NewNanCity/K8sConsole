@@ -1,0 +1,52 @@
+# Go相关忽略
+# 编译生成的二进制文件
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Go模块相关
+vendor/
+
+# 输出目录
+output/
+bin/
+dist/
+
+# Docker相关忽略
+.docker/
+docker-compose.override.yml
+
+# 容器运行时数据
+.container-*
+.dockerignore
+
+# 开发环境相关
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# 日志文件
+*.log
+logs/
+
+# 临时文件
+tmp/
+temp/
+
+# 特定于项目的忽略
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# 缓存目录
+.cache/
