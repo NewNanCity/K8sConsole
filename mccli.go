@@ -193,13 +193,12 @@ func main() {
 	defer screen.cleanup()
 
 	// 创建RCON会话
-	session, err := controller.CreateCommandSession(30 * time.Minute)
+	session, err := controller.CreateCommandSession(30*time.Minute, mccontrol.ExecutorAuto)
 	if err != nil {
-		screen.printError(fmt.Sprintf("创建RCON会话失败: %v", err))
+		screen.printError(fmt.Sprintf("创建指令会话失败: %v", err))
 	} else {
 		screen.cmdSession = session
-		screen.sessionActive = true
-		screen.printInfo("成功创建RCON持久会话，命令将复用连接")
+		screen.printInfo("成功创建指令会话")
 		defer session.Close()
 	}
 
@@ -216,9 +215,12 @@ func main() {
 			TailLines:   &options.maxLogLines,
 			BatchSize:   10,
 			MaxWaitTime: 500 * time.Millisecond,
-		}, func(logs []string) {
+		}, func(logs []string, errorStr string) {
 			for _, line := range logs {
 				screen.printLog(line)
+			}
+			if errorStr != "" {
+				screen.printError(fmt.Sprintf("日志错误: %v", errorStr))
 			}
 		})
 
@@ -322,9 +324,8 @@ type ScreenManager struct {
 	historyIndex       int      // 当前历史记录索引
 	historyTempCommand string   // 临时保存当前命令（浏览历史时使用）
 
-	// RCON会话
-	cmdSession    *mccontrol.CommandSession // RCON命令会话
-	sessionActive bool                      // 会话是否活跃
+	// 命令会话
+	cmdSession *mccontrol.CommandSession // 命令会话
 }
 
 // monitorTerminalSize 监听终端大小变化（平台特定实现）
@@ -384,11 +385,11 @@ func newScreenManager(ctx context.Context, enableColor bool) *ScreenManager {
 		commandBuffer:  "",
 		enableColor:    enableColor,
 		commandHistory: []string{},
-		historyMaxSize: 100,   // 默认保存100条历史记录
-		historyIndex:   -1,    // -1表示当前不在浏览历史记录
-		cursorPos:      0,     // 初始化光标位置
-		scrollOffset:   0,     // 初始化滚动偏移量
-		sessionActive:  false, // 初始化会话状态
+		historyMaxSize: 100, // 默认保存100条历史记录
+		historyIndex:   -1,  // -1表示当前不在浏览历史记录
+		cursorPos:      0,   // 初始化光标位置
+		scrollOffset:   0,   // 初始化滚动偏移量
+		cmdSession:     nil, // 初始化命令会话为nil
 	}
 
 	sm.updateTermSize()
@@ -713,11 +714,8 @@ func (s *ScreenManager) executeCommand(controller *mccontrol.MinecraftController
 	var err error
 
 	// 使用会话执行命令（如果会话有效）
-	if s.sessionActive && s.cmdSession != nil {
+	if s.cmdSession != nil {
 		response, err = s.cmdSession.ExecuteCommand(command)
-	} else {
-		// 如果会话无效，使用一次性命令
-		response, err = controller.ExecuteRconCommand(command)
 	}
 
 	if err != nil {
